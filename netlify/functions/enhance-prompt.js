@@ -3,7 +3,7 @@
 exports.handler = async (event, context) => {
     // Enable CORS for production and local dev (if needed)
     const headers = {
-        'Access-Control-Allow-Origin': 'https://akshatyadav31.github.io', // Change to your deployed frontend domain!
+        'Access-Control-Allow-Origin': 'https://akshatyadav31.github.io/prompt-frontend/', // Change to your deployed frontend domain!
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'POST, OPTIONS'
     };
@@ -105,7 +105,7 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
             headers: {
                 "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://akshatyadav31.github.io",
+                "HTTP-Referer": "https://akshatyadav31.github.io/prompt-frontend/",
                 "X-Title": "Prompt Enhancement Studio"
             },
             body: JSON.stringify({
