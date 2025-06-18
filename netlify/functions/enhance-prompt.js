@@ -3,7 +3,7 @@
 exports.handler = async (event, context) => {
     // Enable CORS for production and local dev (if needed)
     const headers = {
-        'Access-Control-Allow-Origin': 'https://akshatyadav31.github.io/prompt-frontend/', // Change to your deployed frontend domain!
+        'Access-Control-Allow-Origin': '*', // Change to your deployed frontend domain!
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'POST, OPTIONS'
     };
