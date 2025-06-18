@@ -105,7 +105,7 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
             headers: {
                 "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://yourusername.github.io",
+                "HTTP-Referer": "https://akshatyadav31.github.io",
                 "X-Title": "Prompt Enhancement Studio"
             },
             body: JSON.stringify({
