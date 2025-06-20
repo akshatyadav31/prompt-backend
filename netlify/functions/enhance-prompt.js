@@ -181,7 +181,7 @@
 
 exports.handler = async (event, context) => {
     const headers = {
-        'Access-Control-Allow-Origin': '*', // For production, set this to your frontend domain
+        'Access-Control-Allow-Origin': 'https://akshatyadav31.github.io', // For production, set this to your frontend domain
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Access-Control-Allow-Methods': 'POST, OPTIONS'
     };
