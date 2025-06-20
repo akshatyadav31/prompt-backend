@@ -248,7 +248,7 @@ exports.handler = async (event, context) => {
 
         // Environment variables with better error handling
         const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-        const OPENROUTER_MODEL = "deepseek/deepseek-r1:free";
+        const OPENROUTER_MODEL = "deepseek/deepseek-v3-base:free";
         const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
         if (!OPENROUTER_API_KEY) {
