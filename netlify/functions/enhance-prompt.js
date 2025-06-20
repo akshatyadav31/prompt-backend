@@ -209,7 +209,7 @@ exports.handler = async (event, context) => {
         }
 
         // --- HARDCODED API KEY (for testing only) ---
-        const OPENROUTER_API_KEY = "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";
+        const OPENROUTER_API_KEY = "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";
         const OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324:free";
         const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
