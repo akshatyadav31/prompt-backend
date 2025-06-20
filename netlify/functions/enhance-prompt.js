@@ -177,18 +177,26 @@
 
 
 
-// Netlify Function: enhance-prompt.js
+
+         // Netlify Function: enhance-prompt.js
 
 exports.handler = async (event, context) => {
+    // Enhanced CORS headers with more specific configuration
     const headers = {
-        'Access-Control-Allow-Origin': 'https://akshatyadav31.github.io', // For production, set this to your frontend domain
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Max-Age': '86400',
+        'Content-Type': 'application/json'
     };
 
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
-        return { statusCode: 200, headers, body: '' };
+        return { 
+            statusCode: 200, 
+            headers, 
+            body: '' 
+        };
     }
 
     // Only allow POST
@@ -201,18 +209,32 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        // Parse incoming request
+        // Add logging for debugging
+        console.log('Request received:', {
+            method: event.httpMethod,
+            headers: event.headers,
+            bodyLength: event.body?.length || 0
+        });
+
+        // Parse incoming request with better error handling
         let parsed;
         try {
+            if (!event.body) {
+                throw new Error('No request body provided');
+            }
             parsed = JSON.parse(event.body);
         } catch (err) {
-            console.error('Invalid JSON in request body');
+            console.error('JSON parse error:', err.message);
             return {
                 statusCode: 400,
                 headers,
-                body: JSON.stringify({ error: 'Invalid JSON in request body' })
+                body: JSON.stringify({ 
+                    error: 'Invalid JSON in request body',
+                    details: err.message 
+                })
             };
         }
+
         const { input, method, parameters } = parsed;
 
         if (!input?.trim()) {
@@ -224,9 +246,9 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // Environment variables
+        // Environment variables with better error handling
         const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-        const OPENROUTER_MODEL = "deepseek/deepseek-r1-0528:free";
+        const OPENROUTER_MODEL = "deepseek/deepseek-v3-base:free";
         const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
         if (!OPENROUTER_API_KEY) {
@@ -234,22 +256,26 @@ exports.handler = async (event, context) => {
             return {
                 statusCode: 500,
                 headers,
-                body: JSON.stringify({ error: 'Missing OpenRouter API key in environment variables' })
+                body: JSON.stringify({ 
+                    error: 'Server configuration error',
+                    message: 'API key not configured'
+                })
             };
         }
+
+        console.log('Using OpenRouter model:', OPENROUTER_MODEL);
 
         // Framework mapping
         const frameworkMap = {
             rsti: "RSTI",
-            tcrei: "TCREI",
+            tcrei: "TCREI",  
             tfcdc: "TFCDC"
         };
         const frameworks = method && frameworkMap[method] ? [frameworkMap[method]] : [];
         const useCase = parameters?.context || "General use case";
 
         // Compose system prompt
-        const systemPrompt = `
-You are an expert prompt engineering assistant specializing in applying advanced frameworks to transform basic prompts into highly effective, structured prompts.
+        const systemPrompt = `You are an expert prompt engineering assistant specializing in applying advanced frameworks to transform basic prompts into highly effective, structured prompts.
 
 Your expertise includes:
 - TCREI Framework (Task, Context, Resources, Evaluate, Iterate)
@@ -266,15 +292,9 @@ GUIDELINES:
 - Target Length: ${parameters?.wordLimit || 200} words
 
 FRAMEWORK APPLICATION:
-${frameworks.includes('TCREI') ? `
-- TCREI: Structure the prompt with clear Task definition, Context setting, Resource requirements, Evaluation criteria, and Iteration guidelines.
-` : ''}
-${frameworks.includes('RSTI') ? `
-- RSTI: Apply micro-tuning with proven patterns, break complex instructions into clear segments, use precise phrasing, and introduce specific constraints.
-` : ''}
-${frameworks.includes('TFCDC') ? `
-- TFCDC: Include systematic thinking approach, framework selection rationale, checkpoint validation, debugging instructions, and comprehensive documentation.
-` : ''}
+${frameworks.includes('TCREI') ? `- TCREI: Structure the prompt with clear Task definition, Context setting, Resource requirements, Evaluation criteria, and Iteration guidelines.` : ''}
+${frameworks.includes('RSTI') ? `- RSTI: Apply micro-tuning with proven patterns, break complex instructions into clear segments, use precise phrasing, and introduce specific constraints.` : ''}
+${frameworks.includes('TFCDC') ? `- TFCDC: Include systematic thinking approach, framework selection rationale, checkpoint validation, debugging instructions, and comprehensive documentation.` : ''}
 
 OUTPUT REQUIREMENTS:
 1. Create a dramatically enhanced version that's 3-5x more detailed and specific
@@ -284,8 +304,7 @@ OUTPUT REQUIREMENTS:
 5. Ensure the output guides toward ${parameters?.outputFormat || "structured prompt"} structure
 6. Include quality markers and evaluation criteria
 
-Transform the basic prompt into a professional-grade, comprehensive prompt that would produce significantly better AI responses.
-`.trim();
+Transform the basic prompt into a professional-grade, comprehensive prompt that would produce significantly better AI responses.`;
 
         // Compose user prompt
         const userPrompt = `Transform this basic prompt into a comprehensive, professional-grade prompt:
@@ -300,9 +319,30 @@ Target specifications:
 
 Provide only the enhanced prompt without any meta-commentary or explanations.`;
 
-        // Call OpenRouter API
-        const fetch = globalThis.fetch || (await import('node-fetch')).default;
-        const response = await fetch(OPENROUTER_URL, {
+        // Import fetch for Node.js environment
+        let fetch;
+        try {
+            fetch = globalThis.fetch;
+            if (!fetch) {
+                const { default: nodeFetch } = await import('node-fetch');
+                fetch = nodeFetch;
+            }
+        } catch (importError) {
+            console.error('Failed to import fetch:', importError);
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({ 
+                    error: 'Server configuration error',
+                    message: 'Fetch not available'
+                })
+            };
+        }
+
+        console.log('Making request to OpenRouter...');
+
+        // Call OpenRouter API with better error handling
+        const apiResponse = await fetch(OPENROUTER_URL, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
@@ -322,20 +362,44 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
             })
         });
 
-        if (!response.ok) {
-            let errorMsg = response.statusText;
+        console.log('OpenRouter response status:', apiResponse.status);
+
+        if (!apiResponse.ok) {
+            let errorDetails;
             try {
-                const errorData = await response.json();
-                if (errorData?.error?.message) errorMsg = errorData.error.message;
-            } catch (e) { /* ignore */ }
-            throw new Error(`OpenRouter API error: ${response.status} - ${errorMsg}`);
+                errorDetails = await apiResponse.json();
+                console.error('OpenRouter API error details:', errorDetails);
+            } catch (e) {
+                console.error('Failed to parse error response:', e);
+                errorDetails = { error: { message: apiResponse.statusText } };
+            }
+            
+            return {
+                statusCode: 502,
+                headers,
+                body: JSON.stringify({
+                    error: 'External API error',
+                    message: errorDetails?.error?.message || `HTTP ${apiResponse.status}`,
+                    status: apiResponse.status
+                })
+            };
         }
 
-        const data = await response.json();
+        const data = await apiResponse.json();
+        console.log('Received data structure:', Object.keys(data));
+        
         const enhancedContent = data.choices?.[0]?.message?.content;
 
         if (!enhancedContent) {
-            throw new Error("No content received from OpenRouter API");
+            console.error('No content in API response:', data);
+            return {
+                statusCode: 502,
+                headers,
+                body: JSON.stringify({
+                    error: 'Invalid API response',
+                    message: 'No content received from AI service'
+                })
+            };
         }
 
         // Helper to extract framework steps, if present
@@ -347,6 +411,7 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
             };
             const methodSteps = steps[method] || [];
             const suggestions = {};
+            
             methodSteps.forEach(step => {
                 const regex = new RegExp(`${step}[\\s\\-:]*([\\s\\S]+?)(\\n|$)`, "i");
                 const match = content.match(regex);
@@ -363,10 +428,12 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
             suggestions: parseMethodologySteps(enhancedContent, method),
             confidence: 0.9,
             model: OPENROUTER_MODEL,
-            method: frameworkMap[method],
+            method: frameworkMap[method] || null,
             timestamp: new Date().toISOString()
         };
 
+        console.log('Returning successful response');
+        
         return {
             statusCode: 200,
             headers,
@@ -374,13 +441,16 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
         };
 
     } catch (error) {
-        console.error('Function error:', error);
+        console.error('Function error:', error.message);
+        console.error('Error stack:', error.stack);
+        
         return {
             statusCode: 500,
             headers,
             body: JSON.stringify({
                 error: 'Internal server error',
-                message: error.message
+                message: error.message,
+                timestamp: new Date().toISOString()
             })
         };
     }
