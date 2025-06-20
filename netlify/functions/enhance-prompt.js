@@ -177,13 +177,12 @@
 
 
 
-
-         // Netlify Function: enhance-prompt.js
+// Netlify Function: enhance-prompt.js
 
 exports.handler = async (event, context) => {
-    // Enhanced CORS headers with more specific configuration
+    // Enhanced CORS headers
     const headers = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://akshatyadav31.github.io',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Max-Age': '86400',
@@ -246,13 +245,13 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // Environment variables with better error handling
-        const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-        const OPENROUTER_MODEL = "deepseek/deepseek-v3-base:free";
-        const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+        // Environment variables for Gemini API
+        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+        const GEMINI_MODEL = "gemini-2.0-flash";
+        const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-        if (!OPENROUTER_API_KEY) {
-            console.error('Missing OpenRouter API key');
+        if (!GEMINI_API_KEY) {
+            console.error('Missing Gemini API key');
             return {
                 statusCode: 500,
                 headers,
@@ -263,7 +262,7 @@ exports.handler = async (event, context) => {
             };
         }
 
-        console.log('Using OpenRouter model:', OPENROUTER_MODEL);
+        console.log('Using Gemini model:', GEMINI_MODEL);
 
         // Framework mapping
         const frameworkMap = {
@@ -274,8 +273,8 @@ exports.handler = async (event, context) => {
         const frameworks = method && frameworkMap[method] ? [frameworkMap[method]] : [];
         const useCase = parameters?.context || "General use case";
 
-        // Compose system prompt
-        const systemPrompt = `You are an expert prompt engineering assistant specializing in applying advanced frameworks to transform basic prompts into highly effective, structured prompts.
+        // Compose comprehensive prompt for Gemini
+        const fullPrompt = `You are an expert prompt engineering assistant specializing in applying advanced frameworks to transform basic prompts into highly effective, structured prompts.
 
 Your expertise includes:
 - TCREI Framework (Task, Context, Resources, Evaluate, Iterate)
@@ -304,20 +303,18 @@ OUTPUT REQUIREMENTS:
 5. Ensure the output guides toward ${parameters?.outputFormat || "structured prompt"} structure
 6. Include quality markers and evaluation criteria
 
-Transform the basic prompt into a professional-grade, comprehensive prompt that would produce significantly better AI responses.`;
+Transform the basic prompt into a professional-grade, comprehensive prompt that would produce significantly better AI responses.
 
-        // Compose user prompt
-        const userPrompt = `Transform this basic prompt into a comprehensive, professional-grade prompt:
-
+BASIC PROMPT TO TRANSFORM:
 "${input}"
 
-Target specifications:
+TARGET SPECIFICATIONS:
 - Audience: ${parameters?.audienceLevel || "General"} level
 - Tone: ${parameters?.tone || "Professional"}
 - Format: ${parameters?.outputFormat || "Structured prompt"}
 - Length: Approximately ${parameters?.wordLimit || 200} words
 
-Provide only the enhanced prompt without any meta-commentary or explanations.`;
+Provide only the enhanced prompt without any meta-commentary or explanations. Start your response with the enhanced prompt directly.`;
 
         // Import fetch for Node.js environment
         let fetch;
@@ -339,36 +336,57 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
             };
         }
 
-        console.log('Making request to OpenRouter...');
+        console.log('Making request to Gemini API...');
 
-        // Call OpenRouter API with better error handling
-        const apiResponse = await fetch(OPENROUTER_URL, {
+        // Prepare Gemini API request body
+        const requestBody = {
+            contents: [{
+                parts: [{
+                    text: fullPrompt
+                }]
+            }],
+            generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 2048,
+            },
+            safetySettings: [
+                {
+                    category: "HARM_CATEGORY_HARASSMENT",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    category: "HARM_CATEGORY_HATE_SPEECH",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                }
+            ]
+        };
+
+        // Call Gemini API
+        const apiResponse = await fetch(GEMINI_URL, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://akshatyadav31.github.io/prompt-frontend/",
-                "X-Title": "Prompt Enhancement Studio"
+                "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                model: OPENROUTER_MODEL,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ],
-                temperature: 0.7,
-                max_tokens: 2000,
-                top_p: 0.9
-            })
+            body: JSON.stringify(requestBody)
         });
 
-        console.log('OpenRouter response status:', apiResponse.status);
+        console.log('Gemini API response status:', apiResponse.status);
 
         if (!apiResponse.ok) {
             let errorDetails;
             try {
                 errorDetails = await apiResponse.json();
-                console.error('OpenRouter API error details:', errorDetails);
+                console.error('Gemini API error details:', errorDetails);
             } catch (e) {
                 console.error('Failed to parse error response:', e);
                 errorDetails = { error: { message: apiResponse.statusText } };
@@ -388,7 +406,8 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
         const data = await apiResponse.json();
         console.log('Received data structure:', Object.keys(data));
         
-        const enhancedContent = data.choices?.[0]?.message?.content;
+        // Extract content from Gemini response
+        const enhancedContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!enhancedContent) {
             console.error('No content in API response:', data);
@@ -397,7 +416,8 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
                 headers,
                 body: JSON.stringify({
                     error: 'Invalid API response',
-                    message: 'No content received from AI service'
+                    message: 'No content received from AI service',
+                    responseData: data
                 })
             };
         }
@@ -427,7 +447,7 @@ Provide only the enhanced prompt without any meta-commentary or explanations.`;
             enhanced: enhancedContent.trim(),
             suggestions: parseMethodologySteps(enhancedContent, method),
             confidence: 0.9,
-            model: OPENROUTER_MODEL,
+            model: GEMINI_MODEL,
             method: frameworkMap[method] || null,
             timestamp: new Date().toISOString()
         };
